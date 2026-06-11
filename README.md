@@ -49,6 +49,43 @@ Every game can be narrowed before you start:
 The live pool counter tells you how many items match; you need at least 4 to
 start a round.
 
+## Leaderboard (top scores)
+
+After a **Challenge** round you can submit your score with a name, and the
+**Scores** page shows a live top-15 per game (auto-refreshing every 20s).
+
+By default scores are stored **locally per device** (`localStorage`) so the app
+works with no setup. To make the leaderboard **shared and live across all
+players**, point it at a free [Supabase](https://supabase.com) project:
+
+1. Create a free Supabase project.
+2. In the SQL editor, create the table and access policies:
+
+   ```sql
+   create table public.scores (
+     id         bigint generated always as identity primary key,
+     game       text not null,
+     format     text not null default 'mc',
+     name       text not null default 'Anon',
+     score      int  not null default 0,
+     accuracy   int  not null default 0,
+     created_at timestamptz not null default now()
+   );
+   alter table public.scores enable row level security;
+   create policy "public read"   on public.scores for select to anon using (true);
+   create policy "public insert" on public.scores for insert to anon
+     with check (char_length(name) <= 24 and score >= 0 and score <= 1000000);
+   ```
+
+3. In `js/leaderboard.js`, set `SUPABASE_URL` and `SUPABASE_ANON_KEY` to your
+   project's URL and **anon/public** key (safe to commit — it only allows the
+   read/insert above). Bump the `?v=` on the scripts in `index.html` and push.
+
+That's it — scores then sync for everyone. Note the anon key lets anyone POST,
+so scores are unverified (spoofable). For a hardened board, front it with a
+Cloudflare Worker or Supabase Edge Function that rate-limits and validates
+submissions.
+
 ## Running it
 
 Just open `index.html` in a browser. To avoid any browser quirks you can also
@@ -75,7 +112,8 @@ css/styles.css        # HUD/0S design system + app layouts
 js/data/countries.js  # countries + territories (capitals & flags)
 js/data/waters.js     # oceans, seas, lakes, gulfs, bays
 js/data/terrain.js    # mountains & rivers
-js/app.js             # router, game configs, quiz engine
+js/leaderboard.js     # online (Supabase) + local top-scores backend
+js/app.js             # router, game configs, quiz engine, scores page
 js/fx.js              # theme toggle, particle field, custom cursor
 ```
 

@@ -185,8 +185,10 @@
     const route = currentRoute();
     // leaving a game cancels any in-progress quiz
     if (quiz && quiz.game.id !== route) endQuiz();
+    clearScoresTimer(); // stop the leaderboard auto-refresh when leaving
     setActiveNav(route);
     if (route === 'home') return renderHome();
+    if (route === 'scores') return renderScores();
     if (GAMES[route]) {
       if (quiz && quiz.game.id === route) return renderQuiz();
       return renderSetup(GAMES[route]);
@@ -200,6 +202,95 @@
       if (a.dataset.route === route) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
+  }
+
+  /* ============================================================
+     LEADERBOARD helpers + SCORES page
+     ============================================================ */
+  function lbRows(rows) {
+    if (!rows || !rows.length)
+      return '<p class="lb-empty mono">No scores yet — be the first.</p>';
+    return (
+      '<table class="table"><thead><tr><th>#</th><th>Name</th><th>Score</th>' +
+      '<th>Acc</th><th>Fmt</th></tr></thead><tbody>' +
+      rows
+        .map(
+          (r, i) =>
+            `<tr><td>${i + 1}</td><td>${esc(r.name)}</td>` +
+            `<td>${r.score}</td><td>${r.accuracy}%</td>` +
+            `<td><span class="badge">${r.format === 'type' ? 'TYPE' : 'MC'}</span></td></tr>`
+        )
+        .join('') +
+      '</tbody></table>'
+    );
+  }
+
+  async function loadBoard(el, game, limit) {
+    if (!el) return;
+    el.textContent = 'Loading…';
+    try {
+      el.innerHTML = lbRows(await window.LEADERBOARD.top(game, limit));
+    } catch (e) {
+      el.innerHTML = '<p class="lb-empty mono">Could not load scores.</p>';
+    }
+  }
+
+  let scoresTimer = null;
+  function clearScoresTimer() {
+    if (scoresTimer) clearInterval(scoresTimer);
+    scoresTimer = null;
+  }
+
+  function renderScores() {
+    const LB = window.LEADERBOARD;
+    const ids = Object.keys(GAMES);
+    const active = GAMES[renderScores.lastGame] ? renderScores.lastGame : ids[0];
+    const opts = ids
+      .map(
+        (id) =>
+          `<option value="${id}" ${id === active ? 'selected' : ''}>${esc(GAMES[id].title)}</option>`
+      )
+      .join('');
+
+    view.innerHTML = `
+      <section class="scores">
+        <header class="spec__head reveal">
+          <span class="kicker">// Leaderboard</span>
+          <h2>Top Scores</h2>
+          <p>${
+            LB.online
+              ? 'Live global challenge scores — updates automatically.'
+              : 'Local challenge scores saved on this device. Add a Supabase backend to share them online (see README).'
+          }</p>
+        </header>
+        <div class="panel reveal">
+          <div class="scores__head">
+            <div class="field" style="margin:0;max-width:280px">
+              <span class="field__label">Game</span>
+              <select class="select" id="lb-game">${opts}</select>
+            </div>
+            <button class="btn btn--ghost" id="lb-refresh">Refresh</button>
+          </div>
+          <div id="lb-board" class="lb-list" style="margin-top:var(--sp-4)">Loading…</div>
+        </div>
+      </section>`;
+
+    const board = $('#lb-board');
+    const sel = $('#lb-game');
+    const load = () => {
+      renderScores.lastGame = sel.value;
+      return loadBoard(board, sel.value, 15);
+    };
+    sel.addEventListener('change', load);
+    $('#lb-refresh').addEventListener('click', load);
+    load();
+
+    clearScoresTimer();
+    scoresTimer = setInterval(() => {
+      if (currentRoute() !== 'scores') return clearScoresTimer();
+      load();
+    }, 20000);
+    stagger();
   }
 
   /* ============================================================
@@ -718,6 +809,22 @@
       )
       .join('');
 
+    // score submission + top scores (challenge mode only — practice is unscored)
+    const lbCard =
+      quiz.mode === 'challenge'
+        ? `<div class="panel reveal" id="lb-card">
+             <span class="panel__label">Top Scores · ${esc(g.title)}${
+               window.LEADERBOARD.online ? '' : ' · this device'
+             }</span>
+             <div class="lb-submit" id="lb-submit">
+               <input class="input" id="lb-name" maxlength="24" placeholder="Enter your name"
+                 value="${esc(window.LEADERBOARD.lastName())}">
+               <button class="btn btn--primary" id="lb-save">Submit score</button>
+             </div>
+             <div id="lb-list" class="lb-list" style="margin-top:var(--sp-4)">Loading…</div>
+           </div>`
+        : '';
+
     view.innerHTML = `
       <section class="results">
         <header class="spec__head reveal">
@@ -731,6 +838,7 @@
           </div>
           <div class="results__grid">${statHTML}</div>
         </div>
+        ${lbCard}
         <div class="setup__foot reveal">
           <button class="btn btn--ghost" id="home-btn">Home</button>
           <button class="btn" id="again-btn">Change settings</button>
@@ -741,8 +849,9 @@
     const game = g,
       mode = quiz.mode,
       pool = quiz.pool,
-      total = quiz.total;
-    $('#replay-btn').addEventListener('click', () => startQuiz(game, mode, pool, total));
+      total = quiz.total,
+      input = quiz.input;
+    $('#replay-btn').addEventListener('click', () => startQuiz(game, mode, pool, total, input));
     $('#again-btn').addEventListener('click', () => {
       endQuiz();
       renderSetup(game);
@@ -751,6 +860,33 @@
       endQuiz();
       location.hash = '#/home';
     });
+
+    if (mode === 'challenge') {
+      const listEl = $('#lb-list');
+      loadBoard(listEl, game.id, 10);
+      const saveBtn = $('#lb-save');
+      const nameEl = $('#lb-name');
+      const score = quiz.score;
+      saveBtn.addEventListener('click', async () => {
+        const name = (nameEl.value || '').trim() || 'Anon';
+        window.LEADERBOARD.rememberName(name);
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        try {
+          await window.LEADERBOARD.submit({ game: game.id, format: input, name, score, accuracy });
+          $('#lb-submit').innerHTML =
+            '<span class="badge badge--ok"><span class="badge__dot"></span>Score submitted</span>';
+          loadBoard(listEl, game.id, 10);
+        } catch (e) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Submit score';
+          nameEl.insertAdjacentHTML(
+            'afterend',
+            '<p class="lb-empty mono">Submit failed — try again.</p>'
+          );
+        }
+      });
+    }
     stagger();
   }
 

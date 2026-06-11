@@ -257,6 +257,16 @@ a{color:var(--accent);text-decoration:none}
 .alert--info{border-left-color:var(--accent)}
 .alert--err{border-left-color:var(--danger)} .alert--err .alert__icon{color:var(--danger)}
 
+/* ============================================================ DATA TABLE */
+.table{width:100%;border-collapse:collapse;font-size:var(--type-sm)}
+.table th{font-family:var(--font-mono);font-size:var(--type-xs);font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
+  text-align:left;padding:10px 14px;border-bottom:1px solid var(--line-strong)}
+.table td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--text-dim)}
+.table tbody tr{transition:background var(--dur) var(--ease)}
+.table tbody tr:hover{background:var(--accent-dim)}
+.table tbody tr:hover td{color:var(--text)}
+
 /* ============================================================ PROGRESS */
 .progress{height:6px;background:var(--bg-elev-2);border:1px solid var(--line);
   border-radius:var(--radius);overflow:hidden}
@@ -375,6 +385,16 @@ main{padding:var(--sp-6) 0 var(--sp-8);min-height:60vh}
 .results__grid{display:grid;gap:var(--sp-4);grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
 .stat--big{text-align:center;gap:var(--sp-2);padding:var(--sp-3) 0}
 .stat--big .stat__value{font-size:var(--type-2xl);color:var(--accent)}
+
+/* ---- leaderboard ---- */
+.lb-submit{display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center}
+.lb-submit .input{flex:1;min-width:200px}
+.lb-list{overflow-x:auto}
+.lb-list .badge{padding:2px 8px}
+.lb-empty{margin:var(--sp-3) 0 0;color:var(--text-faint);font-size:var(--type-xs);
+  letter-spacing:.12em;text-transform:uppercase}
+.scores__head{display:flex;justify-content:space-between;align-items:flex-end;
+  gap:var(--sp-4);flex-wrap:wrap}
 
 /* ============================================================ RESPONSIVE */
 @media (max-width:640px){
