@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=3">
 </head>
 <body>
 
@@ -39,10 +39,11 @@
 </footer>
 
 <!-- data first, then app logic, then ambient FX -->
-<script src="js/data/countries.js"></script>
-<script src="js/data/waters.js"></script>
-<script src="js/data/terrain.js"></script>
-<script src="js/app.js"></script>
-<script src="js/fx.js"></script>
+<!-- bump ?v= on each release to bust stale browser / Pages caches -->
+<script src="js/data/countries.js?v=3"></script>
+<script src="js/data/waters.js?v=3"></script>
+<script src="js/data/terrain.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
+<script src="js/fx.js?v=3"></script>
 </body>
 </html>
