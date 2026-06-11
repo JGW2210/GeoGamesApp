@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEOGAMES — Geography Quiz Console</title>
+<meta name="description" content="Geography quiz games: world capitals, flags, seas & waters, mountains & rivers. Practice and challenge modes with region-based difficulty.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="fx-particles" aria-hidden="true"></div>
+<div class="fx-grid" aria-hidden="true"></div>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <a class="nav__brand" href="#/home" aria-label="GeoGames home">GEO<b>GAMES</b></a>
+  <div class="nav__links">
+    <a class="nav__link" data-route="home" href="#/home">Home</a>
+    <a class="nav__link" data-route="capitals" href="#/capitals">Capitals</a>
+    <a class="nav__link" data-route="flags" href="#/flags">Flags</a>
+    <a class="nav__link" data-route="waters" href="#/waters">Waters</a>
+    <a class="nav__link" data-route="peaks" href="#/peaks">Peaks &amp; Rivers</a>
+  </div>
+  <label class="switch" title="Toggle theme">
+    <input type="checkbox" id="themeToggle">
+    <span class="switch__track"></span>
+    <span id="themeLabel">DARK</span>
+  </label>
+</nav>
+
+<main class="wrap" id="view"><!-- views render here --></main>
+
+<footer class="wrap" style="padding:var(--sp-7) 0;text-align:center">
+  <span class="kicker">// GEOGAMES · Geography Quiz Console</span>
+</footer>
+
+<!-- data first, then app logic, then ambient FX -->
+<script src="js/data/countries.js"></script>
+<script src="js/data/waters.js"></script>
+<script src="js/data/terrain.js"></script>
+<script src="js/app.js"></script>
+<script src="js/fx.js"></script>
+</body>
+</html>
