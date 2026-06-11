@@ -34,8 +34,9 @@ window.LEADERBOARD = (function () {
   'use strict';
 
   // ---- CONFIG: paste your Supabase values here to go live ----
-  const SUPABASE_URL = '';      // e.g. 'https://abcdefgh.supabase.co'
-  const SUPABASE_ANON_KEY = ''; // the public anon / publishable key
+  const SUPABASE_URL = 'https://ejusndngerpngtqroxze.supabase.co'; // base host, no /rest/v1
+  const SUPABASE_ANON_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqdXNuZG5nZXJwbmd0cXJveHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzgyMzUsImV4cCI6MjA5Njc1NDIzNX0.yV5ZhD7FO4MrEn8wtsehLZ0chPE_il7_V-5M6IGbJtg'; // public anon key (safe to commit)
   const TABLE = 'scores';
 
   const online = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
