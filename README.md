@@ -24,6 +24,18 @@ Selectable from the top navigation bar:
   scores 100 points plus a streak bonus (+20 per consecutive correct). One shot
   per question; finishes with a score, accuracy, best streak and time.
 
+### Answer format
+
+Either mode can be played as:
+
+- **Multiple choice** — pick one of four options (keys `1`–`4`).
+- **Type the answer** — type a free-text answer. Matching is **case-insensitive
+  and spelling-tolerant**: it ignores accents, punctuation and extra spaces,
+  treats *Saint*/*St* and *Mount*/*Mt* the same, lets you drop generic words
+  (so `amazon` matches *Amazon River* and `everest` matches *Mount Everest*),
+  and accepts common alternates (`usa`, `uk`, `uae`, `swaziland`, `colombo` for
+  Sri Lanka's seat of government, etc.).
+
 ## Difficulty filters
 
 Every game can be narrowed before you start:

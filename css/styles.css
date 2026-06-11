@@ -355,6 +355,16 @@ main{padding:var(--sp-6) 0 var(--sp-8);min-height:60vh}
 .option:disabled{opacity:1}
 .option:disabled:not(.option--correct):not(.option--wrong){opacity:.45}
 
+.typed{display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center}
+.typed-input{flex:1;min-width:220px;font-size:var(--type-lg);padding:14px 16px}
+.typed-input:disabled{opacity:1}
+.typed-input.typed--correct{border-color:var(--success);
+  box-shadow:0 0 0 1px var(--success),0 0 20px -8px var(--success)}
+.typed-input.typed--wrong{border-color:var(--danger);
+  box-shadow:0 0 0 1px var(--danger),0 0 20px -8px var(--danger)}
+.typed__hint{flex-basis:100%;margin:0;font-size:var(--type-xs);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--text-faint)}
+
 .feedback{align-items:center}
 .feedback--ok{border-left-color:var(--success)} .feedback--ok .alert__icon{color:var(--success)}
 .quiz__foot{display:flex;justify-content:space-between;gap:var(--sp-3);margin-top:var(--sp-2)}

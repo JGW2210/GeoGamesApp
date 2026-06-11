@@ -28,6 +28,68 @@
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   };
 
+  /* ---------- typed-answer matching (case- & spelling-tolerant) ----------
+     normAns : lowercase, strip accents/punctuation, unify saint/st & mount/mt.
+     coreAns : also drop generic geo words (river, sea, of, the…) so
+               "amazon" matches "Amazon River" and "everest" matches
+               "Mount Everest". Comparison is lenient on purpose — for a
+               learning game a false "wrong" is worse than slight leniency. */
+  const stripDiacritics = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const normAns = (s) => {
+    let v = stripDiacritics(String(s).toLowerCase()).replace(/&/g, ' and ');
+    v = ' ' + v.replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+    v = v.replace(/ saint /g, ' st ').replace(/ mount /g, ' mt ');
+    return v.replace(/\s+/g, ' ').trim();
+  };
+  const GEO_STOP = new Set([
+    'of', 'the', 'and', 'el', 'la', 'le',
+    'river', 'ocean', 'sea', 'lake', 'gulf', 'bay', 'channel',
+    'mt', 'mount', 'mountain', 'mountains',
+  ]);
+  const coreAns = (s) =>
+    normAns(s).split(' ').filter((w) => w && !GEO_STOP.has(w)).join(' ');
+
+  // extra accepted spellings for genuinely ambiguous / abbreviated answers
+  const ALIASES = {
+    'United States': ['usa', 'us', 'america', 'united states of america'],
+    'United Kingdom': ['uk', 'britain', 'great britain'],
+    'United Arab Emirates': ['uae'],
+    'Democratic Republic of the Congo': ['drc', 'dr congo', 'congo kinshasa'],
+    'Republic of the Congo': ['congo', 'congo brazzaville'],
+    'Czechia': ['czech republic'],
+    'Eswatini': ['swaziland'],
+    'Cape Verde': ['cabo verde'],
+    'Timor-Leste': ['east timor'],
+    'Myanmar': ['burma'],
+    'North Macedonia': ['macedonia'],
+    'Ivory Coast': ["cote d'ivoire", 'cote divoire'],
+    'Vatican City': ['vatican', 'holy see'],
+    'Sri Jayawardenepura Kotte': ['colombo', 'kotte', 'sri jayawardenepura'],
+    'Washington, D.C.': ['washington', 'washington dc'],
+    'Aoraki / Mount Cook': ['mount cook', 'mt cook', 'aoraki'],
+  };
+
+  function checkTyped(game, item, raw) {
+    const answer = game.answer(item);
+    const accepted = new Set();
+    const despace = (s) => s.replace(/ /g, '');
+    const add = (v) => {
+      const n = normAns(v);
+      const c = coreAns(v);
+      if (n) accepted.add(n).add(despace(n)); // also match "u s a" -> "usa"
+      if (c) accepted.add(c).add(despace(c));
+    };
+    add(answer);
+    (ALIASES[answer] || []).forEach(add);
+    const userN = normAns(raw);
+    const userC = coreAns(raw);
+    return (
+      accepted.has(userN) ||
+      accepted.has(despace(userN)) ||
+      (!!userC && (accepted.has(userC) || accepted.has(despace(userC))))
+    );
+  }
+
   /* ---------- game definitions ----------
      Each game says where its data lives, how to render the
      prompt, what counts as the answer, and how to label a
@@ -244,6 +306,19 @@
               </label>
             </div>
             <div class="field" style="margin-top:var(--sp-4)">
+              <span class="field__label">Answer format</span>
+              <div class="inline-checks">
+                <label class="check check--radio">
+                  <input type="radio" name="input" value="mc" checked>
+                  <span class="check__box"></span>Multiple choice
+                </label>
+                <label class="check check--radio">
+                  <input type="radio" name="input" value="type">
+                  <span class="check__box"></span>Type the answer
+                </label>
+              </div>
+            </div>
+            <div class="field">
               <span class="field__label">Length (challenge)</span>
               <div class="inline-checks">${countOpts}</div>
             </div>
@@ -291,6 +366,8 @@
     const regionInputs = () => Array.from(document.querySelectorAll('input[name="region"]'));
     const territoriesEl = $('#opt-territories');
     const countEl = () => document.querySelector('input[name="count"]:checked');
+    const inputEl = () => document.querySelector('input[name="input"]:checked');
+    const inputRadios = () => Array.from(document.querySelectorAll('input[name="input"]'));
     const poolBadge = $('#pool-count');
 
     const buildPool = () => {
@@ -305,13 +382,16 @@
 
     const refresh = () => {
       const pool = buildPool();
-      const ok = pool.length >= 4;
+      // multiple choice needs 4 for distractors; typed needs only 1
+      const min = inputEl().value === 'type' ? 1 : 4;
+      const ok = pool.length >= min;
       poolBadge.className = 'badge ' + (ok ? 'badge--ok' : 'badge--err');
       poolBadge.innerHTML = `<span class="badge__dot"></span>${pool.length} in pool`;
       $('#start-btn').disabled = !ok;
     };
 
     regionInputs().forEach((i) => i.addEventListener('change', refresh));
+    inputRadios().forEach((i) => i.addEventListener('change', refresh));
     if (territoriesEl) territoriesEl.addEventListener('change', refresh);
 
     $('#region-all').addEventListener('click', () => {
@@ -325,12 +405,13 @@
 
     $('#start-btn').addEventListener('click', () => {
       const pool = buildPool();
-      if (pool.length < 4) return;
+      const input = inputEl().value;
+      if (pool.length < (input === 'type' ? 1 : 4)) return;
       const mode = document.querySelector('input[name="mode"]:checked').value;
       let count = parseInt(countEl().value, 10);
       if (mode === 'practice') count = pool.length; // practice covers the whole pool
       if (count === 0 || count > pool.length) count = pool.length;
-      startQuiz(game, mode, pool, count);
+      startQuiz(game, mode, pool, count, input);
     });
 
     refresh();
@@ -366,11 +447,18 @@
     return { item, options, correct };
   }
 
-  function startQuiz(game, mode, pool, count) {
+  // build the active question; multiple choice also needs options
+  function makeQuestion(item) {
+    if (quiz.input === 'mc') return buildQuestion(quiz.game, quiz.pool, item);
+    return { item, options: null, correct: quiz.game.answer(item) };
+  }
+
+  function startQuiz(game, mode, pool, count, input) {
     const queue = sample(pool, count);
     quiz = {
       game,
       mode,
+      input: input || 'mc',
       pool,
       queue,
       index: 0,
@@ -383,7 +471,7 @@
       startTime: Date.now(),
       current: null,
     };
-    quiz.current = buildQuestion(game, pool, queue[0]);
+    quiz.current = makeQuestion(queue[0]);
     location.hash = '#/' + game.id;
     renderQuiz();
   }
@@ -410,12 +498,21 @@
           stat('Time', fmtTime(Date.now() - quiz.startTime), 'stat-time')
         : stat('Correct', `${quiz.correct}/${quiz.index}`, 'stat-correct');
 
-    const options = q.options
-      .map(
-        (opt, i) =>
-          `<button class="btn option" data-i="${i}" data-val="${esc(opt)}">${esc(opt)}</button>`
-      )
-      .join('');
+    const answerArea =
+      quiz.input === 'mc'
+        ? `<div class="options reveal" id="options">${q.options
+            .map(
+              (opt, i) =>
+                `<button class="btn option" data-i="${i}" data-val="${esc(opt)}">${esc(opt)}</button>`
+            )
+            .join('')}</div>`
+        : `<form class="typed reveal" id="typed-form" autocomplete="off" novalidate>
+             <input class="input typed-input" id="typed-input" type="text"
+               placeholder="Type your answer…" autocomplete="off"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+             <button class="btn btn--primary" type="submit" id="submit-btn">Submit</button>
+             <p class="typed__hint mono">Case-insensitive · spelling-tolerant</p>
+           </form>`;
 
     view.innerHTML = `
       <section class="quiz">
@@ -437,7 +534,7 @@
           <div class="prompt">${g.promptHTML(q.item)}</div>
         </article>
 
-        <div class="options reveal" id="options">${options}</div>
+        ${answerArea}
 
         <div class="feedback" id="feedback" hidden></div>
 
@@ -471,53 +568,73 @@
     const feedback = $('#feedback');
     const nextBtn = $('#next-btn');
 
+    // shared: record the result, update stats, show feedback + Next
+    function settle(isRight) {
+      quiz.answered = true;
+      if (isRight) {
+        quiz.correct++;
+        quiz.streak++;
+        quiz.bestStreak = Math.max(quiz.bestStreak, quiz.streak);
+        if (quiz.mode === 'challenge') {
+          quiz.score += 100 + (quiz.streak - 1) * 20; // streak bonus
+          const s = $('#stat-score');
+          if (s) s.textContent = quiz.score;
+        }
+      } else {
+        quiz.streak = 0;
+      }
+      if (quiz.mode === 'challenge') {
+        const st = $('#stat-streak');
+        if (st) st.textContent = quiz.streak;
+      } else {
+        const c = $('#stat-correct');
+        if (c) c.textContent = `${quiz.correct}/${quiz.index + 1}`;
+      }
+
+      feedback.hidden = false;
+      feedback.className = 'feedback alert ' + (isRight ? 'alert--info feedback--ok' : 'alert--err');
+      feedback.innerHTML =
+        `<span class="alert__icon">${isRight ? '[✓]' : '[✗]'}</span>` +
+        `<span class="alert__body"><strong>${isRight ? 'Correct.' : 'Not quite.'}</strong> ` +
+        `${quiz.game.reveal(quiz.current.item)}</span>`;
+
+      nextBtn.hidden = false;
+      nextBtn.textContent = quiz.index + 1 >= quiz.total ? 'See results ▸' : 'Next ▸';
+      nextBtn.focus();
+    }
+
+    // ---- multiple choice ----
     optionEls.forEach((btn) =>
       btn.addEventListener('click', () => {
         if (quiz.answered) return;
-        quiz.answered = true;
-        const chosen = btn.dataset.val;
         const correct = quiz.current.correct;
-        const isRight = chosen === correct;
-
+        const isRight = btn.dataset.val === correct;
         optionEls.forEach((b) => {
           b.disabled = true;
           if (b.dataset.val === correct) b.classList.add('option--correct');
           else if (b === btn) b.classList.add('option--wrong');
         });
-
-        // scoring
-        if (isRight) {
-          quiz.correct++;
-          quiz.streak++;
-          quiz.bestStreak = Math.max(quiz.bestStreak, quiz.streak);
-          if (quiz.mode === 'challenge') {
-            quiz.score += 100 + (quiz.streak - 1) * 20; // streak bonus
-            const s = $('#stat-score');
-            if (s) s.textContent = quiz.score;
-          }
-        } else {
-          quiz.streak = 0;
-        }
-        if (quiz.mode === 'challenge') {
-          const st = $('#stat-streak');
-          if (st) st.textContent = quiz.streak;
-        } else {
-          const c = $('#stat-correct');
-          if (c) c.textContent = `${quiz.correct}/${quiz.index + 1}`;
-        }
-
-        feedback.hidden = false;
-        feedback.className = 'feedback alert ' + (isRight ? 'alert--info feedback--ok' : 'alert--err');
-        feedback.innerHTML =
-          `<span class="alert__icon">${isRight ? '[✓]' : '[✗]'}</span>` +
-          `<span class="alert__body"><strong>${isRight ? 'Correct.' : 'Not quite.'}</strong> ` +
-          `${quiz.game.reveal(quiz.current.item)}</span>`;
-
-        nextBtn.hidden = false;
-        nextBtn.focus();
-        nextBtn.textContent = quiz.index + 1 >= quiz.total ? 'See results ▸' : 'Next ▸';
+        settle(isRight);
       })
     );
+
+    // ---- typed answer ----
+    const typedForm = $('#typed-form');
+    const typedInput = $('#typed-input');
+    if (typedForm) {
+      typedForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (quiz.answered) return;
+        if (!typedInput.value.trim()) return; // ignore empty submissions
+        const isRight = checkTyped(quiz.game, quiz.current.item, typedInput.value);
+        typedInput.disabled = true;
+        typedInput.classList.add(isRight ? 'typed--correct' : 'typed--wrong');
+        const submitBtn = $('#submit-btn');
+        if (submitBtn) submitBtn.disabled = true;
+        settle(isRight);
+      });
+      typedInput.focus();
+    }
 
     nextBtn.addEventListener('click', advance);
     $('#quit-btn').addEventListener('click', () => {
@@ -526,15 +643,23 @@
       renderResults();
     });
 
-    // keyboard: 1-4 to answer, Enter to advance
+    // keyboard: 1-4 picks an option (MC); Enter/Space advances once answered.
+    // (When the Next button itself is focused, its native activation advances,
+    // so we bail to avoid a double-skip. Typed input keeps Enter for submit.)
     document.onkeydown = (e) => {
       if (!quiz || quiz.finished) return;
-      if (!quiz.answered && /^[1-4]$/.test(e.key)) {
+      const ae = document.activeElement;
+      if (quiz.answered) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (ae && ae.id === 'next-btn') return;
+          e.preventDefault();
+          advance();
+        }
+        return;
+      }
+      if (quiz.input === 'mc' && /^[1-4]$/.test(e.key)) {
         const el = optionEls[parseInt(e.key, 10) - 1];
         if (el) el.click();
-      } else if (quiz.answered && (e.key === 'Enter' || e.key === ' ')) {
-        e.preventDefault();
-        advance();
       }
     };
   }
@@ -549,7 +674,7 @@
       quiz.elapsed = Date.now() - quiz.startTime;
       return renderResults();
     }
-    quiz.current = buildQuestion(quiz.game, quiz.pool, quiz.queue[quiz.index]);
+    quiz.current = makeQuestion(quiz.queue[quiz.index]);
     renderQuiz();
   }
 
