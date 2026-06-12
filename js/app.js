@@ -212,24 +212,24 @@
       return '<p class="lb-empty mono">No scores yet — be the first.</p>';
     return (
       '<table class="table"><thead><tr><th>#</th><th>Name</th><th>Score</th>' +
-      '<th>Acc</th><th>Fmt</th></tr></thead><tbody>' +
+      '<th>Accuracy</th><th>Format</th></tr></thead><tbody>' +
       rows
         .map(
           (r, i) =>
             `<tr><td>${i + 1}</td><td>${esc(r.name)}</td>` +
             `<td>${r.score}</td><td>${r.accuracy}%</td>` +
-            `<td><span class="badge">${r.format === 'type' ? 'TYPE' : 'MC'}</span></td></tr>`
+            `<td>${r.format === 'type' ? 'Typed' : 'Multiple Choice'}</td></tr>`
         )
         .join('') +
       '</tbody></table>'
     );
   }
 
-  async function loadBoard(el, game, limit) {
+  async function loadBoard(el, game, length, limit) {
     if (!el) return;
     el.textContent = 'Loading…';
     try {
-      el.innerHTML = lbRows(await window.LEADERBOARD.top(game, limit));
+      el.innerHTML = lbRows(await window.LEADERBOARD.top(game, length, limit));
     } catch (e) {
       el.innerHTML = '<p class="lb-empty mono">Could not load scores.</p>';
     }
@@ -241,16 +241,29 @@
     scoresTimer = null;
   }
 
+  const LENGTHS = [
+    ['10', '10 questions'],
+    ['20', '20 questions'],
+    ['all', 'All questions'],
+  ];
+
   function renderScores() {
     const LB = window.LEADERBOARD;
     const ids = Object.keys(GAMES);
-    const active = GAMES[renderScores.lastGame] ? renderScores.lastGame : ids[0];
-    const opts = ids
+    const activeGame = GAMES[renderScores.lastGame] ? renderScores.lastGame : ids[0];
+    const activeLen = LENGTHS.some(([v]) => v === renderScores.lastLength)
+      ? renderScores.lastLength
+      : '10';
+    const gameOpts = ids
       .map(
         (id) =>
-          `<option value="${id}" ${id === active ? 'selected' : ''}>${esc(GAMES[id].title)}</option>`
+          `<option value="${id}" ${id === activeGame ? 'selected' : ''}>${esc(GAMES[id].title)}</option>`
       )
       .join('');
+    const lenOpts = LENGTHS.map(
+      ([v, label]) =>
+        `<option value="${v}" ${v === activeLen ? 'selected' : ''}>${label}</option>`
+    ).join('');
 
     view.innerHTML = `
       <section class="scores">
@@ -265,9 +278,15 @@
         </header>
         <div class="panel reveal">
           <div class="scores__head">
-            <div class="field" style="margin:0;max-width:280px">
-              <span class="field__label">Game</span>
-              <select class="select" id="lb-game">${opts}</select>
+            <div class="scores__filters">
+              <div class="field" style="margin:0">
+                <span class="field__label">Game</span>
+                <select class="select" id="lb-game">${gameOpts}</select>
+              </div>
+              <div class="field" style="margin:0">
+                <span class="field__label">Length</span>
+                <select class="select" id="lb-length">${lenOpts}</select>
+              </div>
             </div>
             <button class="btn btn--ghost" id="lb-refresh">Refresh</button>
           </div>
@@ -276,12 +295,15 @@
       </section>`;
 
     const board = $('#lb-board');
-    const sel = $('#lb-game');
+    const gameSel = $('#lb-game');
+    const lenSel = $('#lb-length');
     const load = () => {
-      renderScores.lastGame = sel.value;
-      return loadBoard(board, sel.value, 15);
+      renderScores.lastGame = gameSel.value;
+      renderScores.lastLength = lenSel.value;
+      return loadBoard(board, gameSel.value, lenSel.value, 15);
     };
-    sel.addEventListener('change', load);
+    gameSel.addEventListener('change', load);
+    lenSel.addEventListener('change', load);
     $('#lb-refresh').addEventListener('click', load);
     load();
 
@@ -499,10 +521,12 @@
       const input = inputEl().value;
       if (pool.length < (input === 'type' ? 1 : 4)) return;
       const mode = document.querySelector('input[name="mode"]:checked').value;
-      let count = parseInt(countEl().value, 10);
+      const rawCount = countEl().value; // '10' | '20' | '0' (=all)
+      const length = rawCount === '0' ? 'all' : rawCount;
+      let count = parseInt(rawCount, 10);
       if (mode === 'practice') count = pool.length; // practice covers the whole pool
       if (count === 0 || count > pool.length) count = pool.length;
-      startQuiz(game, mode, pool, count, input);
+      startQuiz(game, mode, pool, count, input, length);
     });
 
     refresh();
@@ -544,12 +568,13 @@
     return { item, options: null, correct: quiz.game.answer(item) };
   }
 
-  function startQuiz(game, mode, pool, count, input) {
+  function startQuiz(game, mode, pool, count, input, length) {
     const queue = sample(pool, count);
     quiz = {
       game,
       mode,
       input: input || 'mc',
+      length: length || 'all', // challenge length category: '10' | '20' | 'all'
       pool,
       queue,
       index: 0,
@@ -810,10 +835,11 @@
       .join('');
 
     // score submission + top scores (challenge mode only — practice is unscored)
+    const lenLabel = quiz.length === 'all' ? 'All questions' : `${quiz.length} questions`;
     const lbCard =
       quiz.mode === 'challenge'
         ? `<div class="panel reveal" id="lb-card">
-             <span class="panel__label">Top Scores · ${esc(g.title)}${
+             <span class="panel__label">Top Scores · ${esc(g.title)} · ${lenLabel}${
                window.LEADERBOARD.online ? '' : ' · this device'
              }</span>
              <div class="lb-submit" id="lb-submit">
@@ -850,8 +876,11 @@
       mode = quiz.mode,
       pool = quiz.pool,
       total = quiz.total,
-      input = quiz.input;
-    $('#replay-btn').addEventListener('click', () => startQuiz(game, mode, pool, total, input));
+      input = quiz.input,
+      length = quiz.length;
+    $('#replay-btn').addEventListener('click', () =>
+      startQuiz(game, mode, pool, total, input, length)
+    );
     $('#again-btn').addEventListener('click', () => {
       endQuiz();
       renderSetup(game);
@@ -863,7 +892,7 @@
 
     if (mode === 'challenge') {
       const listEl = $('#lb-list');
-      loadBoard(listEl, game.id, 10);
+      loadBoard(listEl, game.id, length, 10);
       const saveBtn = $('#lb-save');
       const nameEl = $('#lb-name');
       const score = quiz.score;
@@ -873,10 +902,10 @@
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
         try {
-          await window.LEADERBOARD.submit({ game: game.id, format: input, name, score, accuracy });
+          await window.LEADERBOARD.submit({ game: game.id, format: input, length, name, score, accuracy });
           $('#lb-submit').innerHTML =
             '<span class="badge badge--ok"><span class="badge__dot"></span>Score submitted</span>';
-          loadBoard(listEl, game.id, 10);
+          loadBoard(listEl, game.id, length, 10);
         } catch (e) {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Submit score';
