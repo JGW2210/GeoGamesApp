@@ -18,12 +18,32 @@
   setTheme(false); // default to light mode
   if (tg) tg.addEventListener('change', () => setTheme(!tg.checked));
 
+  /* ---- MOBILE NAV (hamburger) ---- */
+  (function () {
+    const nav = document.querySelector('.nav');
+    const burger = document.getElementById('navBurger');
+    const links = document.getElementById('navLinks');
+    if (!nav || !burger) return;
+    const close = () => {
+      nav.classList.remove('nav--open');
+      burger.setAttribute('aria-expanded', 'false');
+    };
+    burger.addEventListener('click', () => {
+      const open = nav.classList.toggle('nav--open');
+      burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    if (links) links.addEventListener('click', (e) => {
+      if (e.target.closest('.nav__link')) close(); // close after choosing a page
+    });
+  })();
+
   /* ---- PARTICLE FIELD ---- */
   (function () {
     const layer = document.querySelector('.fx-particles');
     if (!layer) return;
     function build() {
       layer.innerHTML = '';
+      if (window.matchMedia('(max-width:640px)').matches) return; // no particles on phones
       const area = window.innerWidth * window.innerHeight;
       const count = Math.max(30, Math.min(120, Math.round(area / 20000)));
       const frag = document.createDocumentFragment();
