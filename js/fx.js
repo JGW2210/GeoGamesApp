@@ -15,7 +15,7 @@
     if (lbl) lbl.textContent = dark ? 'DARK' : 'LIGHT';
     if (tg) tg.checked = !dark;
   }
-  setTheme(true);
+  setTheme(false); // default to light mode
   if (tg) tg.addEventListener('change', () => setTheme(!tg.checked));
 
   /* ---- PARTICLE FIELD ---- */
