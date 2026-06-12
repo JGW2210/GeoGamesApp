@@ -326,7 +326,9 @@
   let seaSvgPromise = null;
   let seaSvgEl = null;
   let seaHidden = []; // elements currently hidden, to restore next question
+  let seaMarker = null; // the "???" placeholder over the censored name
   let seaState = null; // { item, svg } for the active question
+  const SVGNS = 'http://www.w3.org/2000/svg';
 
   function getSeaSvg() {
     if (seaSvgEl) return Promise.resolve(seaSvgEl);
@@ -351,9 +353,14 @@
     return seaSvgPromise;
   }
 
+  function seaClearMarker() {
+    if (seaMarker && seaMarker.parentNode) seaMarker.parentNode.removeChild(seaMarker);
+    seaMarker = null;
+  }
   function seaRestore() {
     seaHidden.forEach((el) => (el.style.visibility = ''));
     seaHidden = [];
+    seaClearMarker();
   }
   function seaHide(svg, id) {
     const t = svg.getElementById(id);
@@ -361,6 +368,26 @@
       t.style.visibility = 'hidden';
       seaHidden.push(t);
     }
+  }
+  // overlay a large "???" where the censored name used to be
+  function seaPlaceMarker(svg, item, vb) {
+    seaClearMarker();
+    const t = document.createElementNS(SVGNS, 'text');
+    t.setAttribute('x', item.cx);
+    t.setAttribute('y', item.cy);
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('dominant-baseline', 'central');
+    t.setAttribute('font-family', 'Arial, sans-serif');
+    t.setAttribute('font-weight', '700');
+    t.setAttribute('font-size', Math.round(vb.w * 0.07));
+    t.setAttribute('fill', '#d92d43');
+    t.setAttribute('stroke', '#ffffff');
+    t.setAttribute('stroke-width', Math.max(1, vb.w * 0.004));
+    t.setAttribute('paint-order', 'stroke');
+    t.setAttribute('pointer-events', 'none');
+    t.textContent = '???';
+    svg.appendChild(t); // last child → painted on top
+    seaMarker = t;
   }
   function seaViewBox(svg, item, container) {
     const cw = container.clientWidth || 600;
@@ -395,6 +422,7 @@
     seaRestore();
     const vb = seaViewBox(svg, item, container);
     item.ids.forEach((id) => seaHide(svg, id)); // censor the target label
+    seaPlaceMarker(svg, item, vb); // ...and mark it with a large "???"
     if (quiz && quiz.hideLabels) {
       const labels = window.GEO_SEAMAP.labels;
       const targ = new Set(item.ids);
@@ -408,6 +436,7 @@
   }
 
   function seaRevealTarget() {
+    seaClearMarker(); // drop the "???" and show the real name
     if (!seaState) return;
     seaState.item.ids.forEach((id) => {
       const t = seaState.svg.getElementById(id);
