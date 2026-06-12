@@ -876,7 +876,7 @@
 
       nextBtn.hidden = false;
       nextBtn.textContent = quiz.index + 1 >= quiz.total ? 'See results ▸' : 'Next ▸';
-      nextBtn.focus();
+      nextBtn.focus({ preventScroll: true });
     }
 
     // ---- multiple choice ----
@@ -909,7 +909,7 @@
         if (submitBtn) submitBtn.disabled = true;
         settle(isRight);
       });
-      typedInput.focus();
+      typedInput.focus({ preventScroll: true });
     }
 
     nextBtn.addEventListener('click', advance);
