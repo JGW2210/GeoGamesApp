@@ -369,9 +369,21 @@
       seaHidden.push(t);
     }
   }
-  // overlay a large "???" where the censored name used to be
-  function seaPlaceMarker(svg, item, vb) {
+  // overlay a "???" where the censored name used to be, matched to the
+  // size of the body of water's own label so it blends with the map
+  function seaLabelFontSize(svg, id) {
+    const el = svg.getElementById(id);
+    if (!el) return 16;
+    let fs = parseFloat(getComputedStyle(el).fontSize);
+    if (!fs) {
+      const ts = el.querySelector('tspan');
+      if (ts) fs = parseFloat(getComputedStyle(ts).fontSize);
+    }
+    return fs || 16;
+  }
+  function seaPlaceMarker(svg, item) {
     seaClearMarker();
+    const fs = seaLabelFontSize(svg, item.ids[0]);
     const t = document.createElementNS(SVGNS, 'text');
     t.setAttribute('x', item.cx);
     t.setAttribute('y', item.cy);
@@ -379,10 +391,10 @@
     t.setAttribute('dominant-baseline', 'central');
     t.setAttribute('font-family', 'Arial, sans-serif');
     t.setAttribute('font-weight', '700');
-    t.setAttribute('font-size', Math.round(vb.w * 0.07));
+    t.setAttribute('font-size', fs);
     t.setAttribute('fill', '#d92d43');
     t.setAttribute('stroke', '#ffffff');
-    t.setAttribute('stroke-width', Math.max(1, vb.w * 0.004));
+    t.setAttribute('stroke-width', Math.max(0.4, fs * 0.08));
     t.setAttribute('paint-order', 'stroke');
     t.setAttribute('pointer-events', 'none');
     t.textContent = '???';
@@ -422,7 +434,7 @@
     seaRestore();
     const vb = seaViewBox(svg, item, container);
     item.ids.forEach((id) => seaHide(svg, id)); // censor the target label
-    seaPlaceMarker(svg, item, vb); // ...and mark it with a large "???"
+    seaPlaceMarker(svg, item); // ...and mark it with a "???" at label size
     if (quiz && quiz.hideLabels) {
       const labels = window.GEO_SEAMAP.labels;
       const targ = new Set(item.ids);
