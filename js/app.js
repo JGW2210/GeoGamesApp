@@ -131,22 +131,23 @@
       id: 'waters',
       title: 'Seas & Waters',
       kicker: '// Game 03',
-      blurb: 'Identify oceans, seas, gulfs, bays and great lakes from a clue.',
-      data: () => window.GEO_WATERS,
+      blurb: 'Identify seas, oceans, gulfs and bays from a zoomed-in map.',
+      data: () => window.GEO_SEAMAP.items,
       hasTerritories: false,
-      questionLabel: () => 'Which body of water is being described?',
-      promptHTML: (item) =>
-        `<div class="prompt-clue">${esc(item.clue)}</div>` +
-        `<div class="prompt-sub mono">${esc(item.type)} · ${esc(item.region)}</div>`,
+      hasHideLabels: true,
+      isMap: true,
+      questionLabel: () => 'Which body of water is centred in this map view?',
+      promptHTML: () =>
+        `<div class="seamap" id="seamap"><span class="seamap__loading mono">Loading map…</span></div>`,
+      afterPrompt: (item) => renderSeaMap(item),
       answer: (item) => item.name,
-      reveal: (item) => `${esc(item.name)} — ${esc(item.type)}`,
-      preferType: true,
+      reveal: (item) => `${esc(item.name)} · ${esc(item.region)}`,
     },
     peaks: {
       id: 'peaks',
-      title: 'Peaks & Rivers',
+      title: 'Peaks, Rivers & Lakes',
       kicker: '// Game 04',
-      blurb: 'Identify the world’s great mountains and rivers from a clue.',
+      blurb: 'Identify the world’s great mountains, rivers and lakes from a clue.',
       data: () => window.GEO_TERRAIN,
       hasTerritories: false,
       questionLabel: () => 'Which feature is being described?',
@@ -316,6 +317,105 @@
   }
 
   /* ============================================================
+     SEAMAP — zoomed, label-censored map for the Seas & Waters game.
+     The vendored SVG is fetched once and kept as a single node that
+     is moved into each question's container; per question we reset
+     label visibility, set the viewBox to frame the target body of
+     water, and hide its label (plus surrounding ones when enabled).
+     ============================================================ */
+  let seaSvgPromise = null;
+  let seaSvgEl = null;
+  let seaHidden = []; // elements currently hidden, to restore next question
+  let seaState = null; // { item, svg } for the active question
+
+  function getSeaSvg() {
+    if (seaSvgEl) return Promise.resolve(seaSvgEl);
+    if (!seaSvgPromise) {
+      seaSvgPromise = fetch(window.GEO_SEAMAP.src)
+        .then((r) => {
+          if (!r.ok) throw new Error('svg ' + r.status);
+          return r.text();
+        })
+        .then((txt) => {
+          const doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+          // adopt the node into this document before it can be appended
+          const svg = document.adoptNode(doc.documentElement);
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+          svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+          svg.classList.add('seamap__svg');
+          seaSvgEl = svg;
+          return svg;
+        });
+    }
+    return seaSvgPromise;
+  }
+
+  function seaRestore() {
+    seaHidden.forEach((el) => (el.style.visibility = ''));
+    seaHidden = [];
+  }
+  function seaHide(svg, id) {
+    const t = svg.getElementById(id);
+    if (t) {
+      t.style.visibility = 'hidden';
+      seaHidden.push(t);
+    }
+  }
+  function seaViewBox(svg, item, container) {
+    const cw = container.clientWidth || 600;
+    const ch = container.clientHeight || cw / 1.5;
+    const aspect = cw / ch;
+    const MW = window.GEO_SEAMAP.viewW;
+    const MH = window.GEO_SEAMAP.viewH;
+    let w = item.frame;
+    let h = w / aspect;
+    if (h > MH) { h = MH; w = h * aspect; }
+    if (w > MW) { w = MW; h = w / aspect; }
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const x = clamp(item.cx - w / 2, 0, MW - w);
+    const y = clamp(item.cy - h / 2, 0, MH - h);
+    svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+    return { x, y, w, h };
+  }
+
+  async function renderSeaMap(item) {
+    const container = document.getElementById('seamap');
+    if (!container) return;
+    let svg;
+    try {
+      svg = await getSeaSvg();
+    } catch (e) {
+      container.innerHTML = '<span class="seamap__loading mono">Map failed to load.</span>';
+      return;
+    }
+    if (document.getElementById('seamap') !== container) return; // navigated away mid-fetch
+    container.innerHTML = '';
+    container.appendChild(svg); // move the shared node into this question
+    seaRestore();
+    const vb = seaViewBox(svg, item, container);
+    item.ids.forEach((id) => seaHide(svg, id)); // censor the target label
+    if (quiz && quiz.hideLabels) {
+      const labels = window.GEO_SEAMAP.labels;
+      const targ = new Set(item.ids);
+      for (const id in labels) {
+        if (targ.has(id)) continue;
+        const [lx, ly] = labels[id];
+        if (lx >= vb.x && lx <= vb.x + vb.w && ly >= vb.y && ly <= vb.y + vb.h) seaHide(svg, id);
+      }
+    }
+    seaState = { item, svg };
+  }
+
+  function seaRevealTarget() {
+    if (!seaState) return;
+    seaState.item.ids.forEach((id) => {
+      const t = seaState.svg.getElementById(id);
+      if (t) t.style.visibility = '';
+    });
+  }
+
+  /* ============================================================
      HOME
      ============================================================ */
   function renderHome() {
@@ -387,6 +487,17 @@
          </div>`
       : '';
 
+    const hideLabelsRow = game.hasHideLabels
+      ? `<div class="field">
+           <span class="field__label">Map difficulty</span>
+           <label class="switch">
+             <input type="checkbox" id="opt-hidelabels">
+             <span class="switch__track"></span>
+             Hide names of surrounding waters
+           </label>
+         </div>`
+      : '';
+
     const countOpts = COUNTS.map(
       (c, i) => `
       <label class="check check--radio">
@@ -446,6 +557,7 @@
               <button class="btn btn--ghost" type="button" id="region-none">None</button>
             </div>
             ${territoryRow}
+            ${hideLabelsRow}
           </div>
         </div>
 
@@ -516,6 +628,8 @@
       refresh();
     });
 
+    const hideLabelsEl = $('#opt-hidelabels');
+
     $('#start-btn').addEventListener('click', () => {
       const pool = buildPool();
       const input = inputEl().value;
@@ -526,7 +640,8 @@
       let count = parseInt(rawCount, 10);
       if (mode === 'practice') count = pool.length; // practice covers the whole pool
       if (count === 0 || count > pool.length) count = pool.length;
-      startQuiz(game, mode, pool, count, input, length);
+      const hideLabels = hideLabelsEl ? hideLabelsEl.checked : false;
+      startQuiz(game, mode, pool, count, input, length, hideLabels);
     });
 
     refresh();
@@ -568,13 +683,14 @@
     return { item, options: null, correct: quiz.game.answer(item) };
   }
 
-  function startQuiz(game, mode, pool, count, input, length) {
+  function startQuiz(game, mode, pool, count, input, length, hideLabels) {
     const queue = sample(pool, count);
     quiz = {
       game,
       mode,
       input: input || 'mc',
       length: length || 'all', // challenge length category: '10' | '20' | 'all'
+      hideLabels: !!hideLabels, // hide surrounding water names (map game)
       pool,
       queue,
       index: 0,
@@ -662,6 +778,7 @@
 
     wireQuiz();
     stagger();
+    if (g.afterPrompt) g.afterPrompt(q.item); // e.g. inject + frame the sea map
     if (quiz.mode === 'challenge') startTimer();
   }
 
@@ -713,6 +830,8 @@
         `<span class="alert__icon">${isRight ? '[✓]' : '[✗]'}</span>` +
         `<span class="alert__body"><strong>${isRight ? 'Correct.' : 'Not quite.'}</strong> ` +
         `${quiz.game.reveal(quiz.current.item)}</span>`;
+
+      if (quiz.game.isMap) seaRevealTarget(); // un-censor the answer on the map
 
       nextBtn.hidden = false;
       nextBtn.textContent = quiz.index + 1 >= quiz.total ? 'See results ▸' : 'Next ▸';
@@ -877,9 +996,10 @@
       pool = quiz.pool,
       total = quiz.total,
       input = quiz.input,
-      length = quiz.length;
+      length = quiz.length,
+      hideLabels = quiz.hideLabels;
     $('#replay-btn').addEventListener('click', () =>
-      startQuiz(game, mode, pool, total, input, length)
+      startQuiz(game, mode, pool, total, input, length, hideLabels)
     );
     $('#again-btn').addEventListener('click', () => {
       endQuiz();

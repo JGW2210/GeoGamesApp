@@ -72,6 +72,28 @@
     F('Oceania', [
       ['Murray River', 'River', "Australia's longest river."],
       ['Darling River', 'River', 'A long river of inland eastern Australia, tributary of the Murray.'],
+    ]),
+
+    // ---- Lakes ----
+    F('Asia', [
+      ['Caspian Sea', 'Lake', "The world's largest inland body of water, a salt lake bordered by five nations."],
+      ['Lake Baikal', 'Lake', "The world's deepest and oldest freshwater lake, in Siberia."],
+      ['Aral Sea', 'Lake', 'A once-vast Central Asian lake that has largely dried up.'],
+      ['Dead Sea', 'Lake', 'A hypersaline lake at the lowest land elevation on Earth.'],
+    ]),
+    F('Africa', [
+      ['Lake Victoria', 'Lake', "Africa's largest lake and a source of the White Nile."],
+      ['Lake Tanganyika', 'Lake', "The world's second-deepest lake, in the East African Rift."],
+      ['Lake Malawi', 'Lake', 'A long Rift Valley lake bordering Malawi, Mozambique and Tanzania.'],
+      ['Lake Chad', 'Lake', 'A shrinking lake where four African nations meet.'],
+    ]),
+    F('North America', [
+      ['Lake Superior', 'Lake', 'The largest of the Great Lakes by surface area.'],
+      ['Great Salt Lake', 'Lake', 'A large saline lake in the US state of Utah.'],
+    ]),
+    F('South America', [
+      ['Lake Titicaca', 'Lake', 'The highest navigable lake, on the Bolivia–Peru border.'],
+      ['Lake Maracaibo', 'Lake', 'A large brackish inlet in northwestern Venezuela.'],
     ])
   );
 

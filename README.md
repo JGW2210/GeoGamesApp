@@ -13,8 +13,8 @@ Selectable from the top navigation bar:
 |------|-------------------|
 | **Capitals** | The capital of each country, territory or dependency |
 | **Flags** | The country / region / territory from its flag |
-| **Waters** | Oceans, seas, gulfs, bays and great lakes from a clue |
-| **Peaks & Rivers** | The world's great mountains and rivers from a clue |
+| **Waters** | Seas, oceans, gulfs and bays — from a **zoomed-in map** with the name censored |
+| **Peaks, Rivers & Lakes** | The world's great mountains, rivers and lakes from a clue |
 
 ## Modes
 
@@ -40,14 +40,29 @@ Either mode can be played as:
 
 Every game can be narrowed before you start:
 
-- **Regions** — pick which continents (and *Oceans* for the Waters game) to
-  draw questions from.
+- **Regions** — pick which continents/basins (e.g. *Polar* for the Waters game)
+  to draw questions from.
 - **Extra questions** — the Capitals and Flags games have an *Include
   territories & dependencies* toggle (Greenland, Puerto Rico, Hong Kong,
   Gibraltar, French Polynesia, …) for an extra layer of difficulty.
+- **Map difficulty** — the Waters game has a *Hide names of surrounding waters*
+  toggle (off by default) that blanks the labels of neighbouring seas inside the
+  zoomed frame, leaving only the coastline and country names as clues.
 
 The live pool counter tells you how many items match; you need at least 4 to
-start a round.
+start a round (1 for typed answers).
+
+## Seas & Waters map game
+
+The Waters game zooms a world seas/oceans map to centre each body of water so it
+fills most of the frame (offset toward an edge only when it sits near the map
+border), and **censors the target's name**. You then identify it by multiple
+choice or by typing. After you answer, the name is revealed on the map.
+
+The map is the Wikimedia Commons SVG **“Oceans and seas boundaries map (en)”**
+by *Pinpin*, licensed **CC BY-SA 3.0**, vendored as `oceans-seas.svg`. The
+catalogue in `js/data/seamap.js` (focal point, zoom frame and the label element
+ids to censor for each sea) is generated from that SVG.
 
 ## Leaderboard (top scores)
 
@@ -119,11 +134,12 @@ the Flags game automatically falls back to Unicode flag emoji.
 ```
 index.html            # nav, view container, FX layers, script tags
 css/styles.css        # HUD/0S design system + app layouts
+oceans-seas.svg       # vendored world seas/oceans map (CC BY-SA 3.0)
 js/data/countries.js  # countries + territories (capitals & flags)
-js/data/waters.js     # oceans, seas, lakes, gulfs, bays
-js/data/terrain.js    # mountains & rivers
+js/data/seamap.js     # seas/oceans/gulfs map catalogue (generated from the SVG)
+js/data/terrain.js    # mountains, rivers & lakes
 js/leaderboard.js     # online (Supabase) + local top-scores backend
-js/app.js             # router, game configs, quiz engine, scores page
+js/app.js             # router, game configs, quiz engine, scores page, sea map
 js/fx.js              # theme toggle, particle field, custom cursor
 ```
 
