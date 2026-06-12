@@ -52,7 +52,9 @@ start a round.
 ## Leaderboard (top scores)
 
 After a **Challenge** round you can submit your score with a name, and the
-**Scores** page shows a live top-15 per game (auto-refreshing every 20s).
+**Scores** page shows a live top-15 (auto-refreshing every 20s), filterable by
+**game** and by **challenge length** — 10-question, 20-question and All-question
+runs are ranked as separate boards so they're compared fairly.
 
 By default scores are stored **locally per device** (`localStorage`) so the app
 works with no setup. To make the leaderboard **shared and live across all
@@ -66,6 +68,7 @@ players**, point it at a free [Supabase](https://supabase.com) project:
      id         bigint generated always as identity primary key,
      game       text not null,
      format     text not null default 'mc',
+     length     text not null default 'all',   -- '10' | '20' | 'all'
      name       text not null default 'Anon',
      score      int  not null default 0,
      accuracy   int  not null default 0,
@@ -75,6 +78,13 @@ players**, point it at a free [Supabase](https://supabase.com) project:
    create policy "public read"   on public.scores for select to anon using (true);
    create policy "public insert" on public.scores for insert to anon
      with check (char_length(name) <= 24 and score >= 0 and score <= 1000000);
+   ```
+
+   **Already created the table from an earlier version?** Just add the
+   `length` column (the leaderboard now filters by challenge length):
+
+   ```sql
+   alter table public.scores add column if not exists length text not null default 'all';
    ```
 
 3. In `js/leaderboard.js`, set `SUPABASE_URL` and `SUPABASE_ANON_KEY` to your

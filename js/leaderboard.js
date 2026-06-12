@@ -13,11 +13,14 @@
        id         bigint generated always as identity primary key,
        game       text not null,
        format     text not null default 'mc',
+       length     text not null default 'all',   -- '10' | '20' | 'all'
        name       text not null default 'Anon',
        score      int  not null default 0,
        accuracy   int  not null default 0,
        created_at timestamptz not null default now()
      );
+     -- if the table already exists, add the column instead:
+     --   alter table public.scores add column if not exists length text not null default 'all';
      alter table public.scores enable row level security;
      create policy "public read"  on public.scores
        for select to anon using (true);
@@ -48,9 +51,11 @@ window.LEADERBOARD = (function () {
   });
 
   function clean(entry) {
+    const len = String(entry.length);
     return {
       game: String(entry.game),
       format: entry.format === 'type' ? 'type' : 'mc',
+      length: len === '10' || len === '20' ? len : 'all',
       name: (String(entry.name || 'Anon').trim() || 'Anon').slice(0, 24),
       score: Math.max(0, entry.score | 0),
       accuracy: Math.max(0, Math.min(100, entry.accuracy | 0)),
@@ -68,12 +73,13 @@ window.LEADERBOARD = (function () {
     if (!res.ok) throw new Error('submit failed: ' + res.status);
   }
 
-  async function top(game, limit = 10) {
-    if (!online) return localTop(game, limit);
+  async function top(game, length, limit = 10) {
+    if (!online) return localTop(game, length, limit);
     const url =
       `${SUPABASE_URL}/rest/v1/${TABLE}` +
-      `?select=name,score,accuracy,format,created_at` +
+      `?select=name,score,accuracy,format,length,created_at` +
       `&game=eq.${encodeURIComponent(game)}` +
+      `&length=eq.${encodeURIComponent(length)}` +
       `&order=score.desc&limit=${limit}`;
     const res = await fetch(url, { headers: headers() });
     if (!res.ok) throw new Error('fetch failed: ' + res.status);
@@ -97,10 +103,10 @@ window.LEADERBOARD = (function () {
     } catch (e) {}
     return Promise.resolve();
   }
-  function localTop(game, limit) {
+  function localTop(game, length, limit) {
     return Promise.resolve(
       allLocal()
-        .filter((r) => r.game === game)
+        .filter((r) => r.game === game && (r.length || 'all') === length)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit)
     );

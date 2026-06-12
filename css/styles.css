@@ -395,6 +395,8 @@ main{padding:var(--sp-6) 0 var(--sp-8);min-height:60vh}
   letter-spacing:.12em;text-transform:uppercase}
 .scores__head{display:flex;justify-content:space-between;align-items:flex-end;
   gap:var(--sp-4);flex-wrap:wrap}
+.scores__filters{display:flex;gap:var(--sp-4);flex-wrap:wrap}
+.scores__filters .field{min-width:200px}
 
 /* ============================================================ RESPONSIVE */
 @media (max-width:640px){
